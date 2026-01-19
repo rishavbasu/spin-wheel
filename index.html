@@ -1,0 +1,238 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { Plus, Trash2, RotateCw } from 'lucide-react';
+
+export default function SpinWheelApp() {
+  const [items, setItems] = useState([
+    'Prize 1',
+    'Prize 2',
+    'Prize 3',
+    'Prize 4',
+    'Prize 5',
+    'Prize 6'
+  ]);
+  const [newItem, setNewItem] = useState('');
+  const [isSpinning, setIsSpinning] = useState(false);
+  const [rotation, setRotation] = useState(0);
+  const [winner, setWinner] = useState(null);
+  const wheelRef = useRef(null);
+
+  const colors = [
+    '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A',
+    '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2',
+    '#F8B739', '#52B788', '#EF476F', '#06AED5'
+  ];
+
+  const addItem = () => {
+    if (newItem.trim() && items.length < 20) {
+      setItems([...items, newItem.trim()]);
+      setNewItem('');
+    }
+  };
+
+  const removeItem = (index) => {
+    if (items.length > 2) {
+      setItems(items.filter((_, i) => i !== index));
+    }
+  };
+
+  const spinWheel = () => {
+    if (isSpinning || items.length === 0) return;
+
+    setIsSpinning(true);
+    setWinner(null);
+
+    // Generate truly random index
+    const randomIndex = Math.floor(Math.random() * items.length);
+    
+    // Calculate rotation: multiple full spins + position for selected item
+    const segmentAngle = 360 / items.length;
+    const baseRotation = 360 * 5; // 5 full spins
+    const targetRotation = baseRotation + (360 - (randomIndex * segmentAngle + segmentAngle / 2));
+    
+    // Add current rotation to make it continuous
+    const finalRotation = rotation + targetRotation;
+    
+    setRotation(finalRotation);
+
+    // Show winner after animation
+    setTimeout(() => {
+      setIsSpinning(false);
+      setWinner(items[randomIndex]);
+    }, 4000);
+  };
+
+  const resetWheel = () => {
+    setRotation(0);
+    setWinner(null);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-red-500 p-4 flex items-center justify-center">
+      <div className="w-full max-w-6xl">
+        <h1 className="text-4xl md:text-5xl font-bold text-white text-center mb-8 drop-shadow-lg">
+          Spin the Wheel
+        </h1>
+
+        <div className="grid md:grid-cols-2 gap-8">
+          {/* Wheel Section */}
+          <div className="flex flex-col items-center">
+            <div className="relative mb-6">
+              {/* Pointer */}
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-6 z-10">
+                <div className="w-0 h-0 border-l-[20px] border-l-transparent border-r-[20px] border-r-transparent border-t-[40px] border-t-yellow-400 drop-shadow-lg" />
+              </div>
+
+              {/* Wheel */}
+              <div className="relative w-80 h-80 md:w-96 md:h-96">
+                <svg
+                  ref={wheelRef}
+                  className="w-full h-full drop-shadow-2xl"
+                  style={{
+                    transform: `rotate(${rotation}deg)`,
+                    transition: isSpinning ? 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)' : 'none'
+                  }}
+                  viewBox="0 0 200 200"
+                >
+                  {/* Outer circle */}
+                  <circle cx="100" cy="100" r="98" fill="#fff" stroke="#333" strokeWidth="2" />
+                  
+                  {/* Segments */}
+                  {items.map((item, index) => {
+                    const angle = (360 / items.length) * index;
+                    const nextAngle = (360 / items.length) * (index + 1);
+                    const startAngle = (angle - 90) * (Math.PI / 180);
+                    const endAngle = (nextAngle - 90) * (Math.PI / 180);
+                    
+                    const x1 = 100 + 95 * Math.cos(startAngle);
+                    const y1 = 100 + 95 * Math.sin(startAngle);
+                    const x2 = 100 + 95 * Math.cos(endAngle);
+                    const y2 = 100 + 95 * Math.sin(endAngle);
+                    
+                    const largeArc = items.length <= 2 ? 1 : 0;
+                    
+                    const textAngle = angle + (360 / items.length) / 2 - 90;
+                    const textRadius = 65;
+                    const textX = 100 + textRadius * Math.cos(textAngle * Math.PI / 180);
+                    const textY = 100 + textRadius * Math.sin(textAngle * Math.PI / 180);
+                    
+                    return (
+                      <g key={index}>
+                        <path
+                          d={`M 100 100 L ${x1} ${y1} A 95 95 0 ${largeArc} 1 ${x2} ${y2} Z`}
+                          fill={colors[index % colors.length]}
+                          stroke="#fff"
+                          strokeWidth="2"
+                        />
+                        <text
+                          x={textX}
+                          y={textY}
+                          fill="#fff"
+                          fontSize="10"
+                          fontWeight="bold"
+                          textAnchor="middle"
+                          dominantBaseline="middle"
+                          transform={`rotate(${textAngle + 90}, ${textX}, ${textY})`}
+                          style={{ pointerEvents: 'none' }}
+                        >
+                          {item.length > 12 ? item.substring(0, 12) + '...' : item}
+                        </text>
+                      </g>
+                    );
+                  })}
+                  
+                  {/* Center circle */}
+                  <circle cx="100" cy="100" r="15" fill="#333" />
+                  <circle cx="100" cy="100" r="10" fill="#fff" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Spin Button */}
+            <button
+              onClick={spinWheel}
+              disabled={isSpinning || items.length === 0}
+              className="bg-yellow-400 hover:bg-yellow-500 disabled:bg-gray-400 disabled:cursor-not-allowed text-gray-900 font-bold py-4 px-8 rounded-full text-xl shadow-lg transform transition hover:scale-105 disabled:hover:scale-100 flex items-center gap-2"
+            >
+              <RotateCw className={isSpinning ? 'animate-spin' : ''} />
+              {isSpinning ? 'Spinning...' : 'SPIN!'}
+            </button>
+
+            {/* Winner Display */}
+            {winner && (
+              <div className="mt-6 bg-white rounded-xl p-6 shadow-2xl text-center animate-bounce">
+                <p className="text-gray-600 text-sm font-semibold mb-2">WINNER!</p>
+                <p className="text-3xl font-bold text-purple-600">{winner}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Controls Section */}
+          <div className="bg-white rounded-2xl shadow-2xl p-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">Wheel Items</h2>
+            
+            {/* Add Item */}
+            <div className="flex gap-2 mb-6">
+              <input
+                type="text"
+                value={newItem}
+                onChange={(e) => setNewItem(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && addItem()}
+                placeholder="Enter new item..."
+                maxLength={30}
+                className="flex-1 px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-500"
+              />
+              <button
+                onClick={addItem}
+                disabled={!newItem.trim() || items.length >= 20}
+                className="bg-purple-500 hover:bg-purple-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg flex items-center gap-2 transition"
+              >
+                <Plus size={20} />
+                Add
+              </button>
+            </div>
+
+            {/* Items List */}
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {items.map((item, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition"
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-6 h-6 rounded-full"
+                      style={{ backgroundColor: colors[index % colors.length] }}
+                    />
+                    <span className="font-medium text-gray-700">{item}</span>
+                  </div>
+                  <button
+                    onClick={() => removeItem(index)}
+                    disabled={items.length <= 2}
+                    className="text-red-500 hover:text-red-700 disabled:text-gray-300 disabled:cursor-not-allowed transition"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {items.length >= 20 && (
+              <p className="text-sm text-amber-600 mt-4">Maximum 20 items reached</p>
+            )}
+            {items.length <= 2 && (
+              <p className="text-sm text-amber-600 mt-4">Minimum 2 items required</p>
+            )}
+
+            {/* Reset Button */}
+            <button
+              onClick={resetWheel}
+              className="w-full mt-4 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2 px-4 rounded-lg transition"
+            >
+              Reset Rotation
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
