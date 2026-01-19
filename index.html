@@ -1,292 +1,360 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Spin Wheel</title>
-  <style>
-    :root {
-      --primary: #4f46e5;
-      --bg: #0f172a;
-      --card: #111827;
-      --text: #e5e7eb;
-    }
-
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      background: linear-gradient(135deg, #020617, #020617);
-      color: var(--text);
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-
-    .app {
-      max-width: 900px;
-      width: 100%;
-      padding: 24px;
-      display: grid;
-      grid-template-columns: 1fr 320px;
-      gap: 24px;
-    }
-
-    @media (max-width: 768px) {
-      .app {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .wheel-card, .control-card {
-      background: var(--card);
-      border-radius: 16px;
-      padding: 20px;
-      box-shadow: 0 10px 30px rgba(0,0,0,.4);
-    }
-
-    h1, h2 {
-      margin-top: 0;
-      font-weight: 600;
-    }
-
-    canvas {
-      display: block;
-      margin: 0 auto;
-    }
-
-    .pointer {
-      width: 0;
-      height: 0;
-      border-left: 14px solid transparent;
-      border-right: 14px solid transparent;
-      border-bottom: 24px solid #facc15;
-      margin: 0 auto 8px auto;
-    }
-
-    button {
-      appearance: none;
-      border: none;
-      border-radius: 10px;
-      padding: 12px 16px;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      background: var(--primary);
-      color: white;
-    }
-
-    button.secondary {
-      background: #374151;
-    }
-
-    button:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    .actions {
-      display: flex;
-      justify-content: center;
-      gap: 12px;
-      margin-top: 16px;
-    }
-
-    ul {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-    }
-
-    li {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 8px 0;
-      border-bottom: 1px solid #1f2933;
-    }
-
-    input[type="text"] {
-      width: 100%;
-      padding: 10px 12px;
-      border-radius: 8px;
-      border: 1px solid #374151;
-      background: #020617;
-      color: var(--text);
-      font-size: 14px;
-    }
-
-    .add-item {
-      display: flex;
-      gap: 8px;
-      margin-top: 12px;
-    }
-
-    .result {
-      margin-top: 16px;
-      text-align: center;
-      font-size: 18px;
-      font-weight: 600;
-      color: #22c55e;
-    }
-  </style>
-</head>
-<body>
-  <div class="app">
-    <div class="wheel-card">
-      <h1>Spin the Wheel</h1>
-      <div class="pointer"></div>
-      <canvas id="wheel" width="400" height="400"></canvas>
-      <div class="actions">
-        <button id="spinBtn">Spin</button>
-        <button id="resetBtn" class="secondary">Reset</button>
-      </div>
-      <div id="result" class="result"></div>
-    </div>
-
-    <div class="control-card">
-      <h2>Wheel Items</h2>
-      <ul id="itemsList"></ul>
-      <div class="add-item">
-        <input id="newItem" type="text" placeholder="Add new item" />
-        <button id="addBtn">Add</button>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    const canvas = document.getElementById('wheel');
-    const ctx = canvas.getContext('2d');
-    const spinBtn = document.getElementById('spinBtn');
-    const resetBtn = document.getElementById('resetBtn');
-    const resultEl = document.getElementById('result');
-    const itemsListEl = document.getElementById('itemsList');
-    const newItemInput = document.getElementById('newItem');
-    const addBtn = document.getElementById('addBtn');
-
-    const size = canvas.width;
-    const center = size / 2;
-
-    let items = loadItems();
-    let angle = 0;
-    let spinning = false;
-
-    function loadItems() {
-      const stored = localStorage.getItem('wheel-items');
-      return stored ? JSON.parse(stored) : ['Option 1', 'Option 2', 'Option 3'];
-    }
-
-    function saveItems() {
-      localStorage.setItem('wheel-items', JSON.stringify(items));
-    }
-
-    function drawWheel() {
-      ctx.clearRect(0, 0, size, size);
-      if (items.length === 0) return;
-
-      const slice = (2 * Math.PI) / items.length;
-
-      items.forEach((item, i) => {
-        const start = angle + i * slice;
-        const end = start + slice;
-
-        ctx.beginPath();
-        ctx.moveTo(center, center);
-        ctx.arc(center, center, center - 10, start, end);
-        ctx.closePath();
-
-        ctx.fillStyle = `hsl(${(i * 360) / items.length}, 70%, 50%)`;
-        ctx.fill();
-
-        ctx.save();
-        ctx.translate(center, center);
-        ctx.rotate(start + slice / 2);
-        ctx.textAlign = 'right';
-        ctx.fillStyle = '#fff';
-        ctx.font = '16px sans-serif';
-        ctx.fillText(item, center - 20, 6);
-        ctx.restore();
-      });
-    }
-
-    function spin() {
-      if (spinning || items.length === 0) return;
-
-      spinning = true;
-      resultEl.textContent = '';
-
-      const randomSpins = Math.random() * 10 + 10; // ensures full randomness
-      const targetAngle = angle + randomSpins * 2 * Math.PI;
-      const duration = 3000;
-      const start = performance.now();
-
-      function animate(now) {
-        const progress = Math.min((now - start) / duration, 1);
-        const ease = 1 - Math.pow(1 - progress, 3);
-        angle = angle + (targetAngle - angle) * ease;
-        drawWheel();
-
-        if (progress < 1) {
-          requestAnimationFrame(animate);
-        } else {
-          spinning = false;
-          selectItem();
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spin Wheel Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at top left, #1a1a2e, #16213e);
+            color: white;
+            min-height: 100vh;
+            overflow-x: hidden;
         }
-      }
 
-      requestAnimationFrame(animate);
-    }
+        .wheel-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            aspect-ratio: 1;
+            margin: 0 auto;
+        }
 
-    function selectItem() {
-      const slice = (2 * Math.PI) / items.length;
-      const normalized = (2 * Math.PI - (angle % (2 * Math.PI))) % (2 * Math.PI);
-      const index = Math.floor(normalized / slice);
-      const selected = items[index];
-      resultEl.textContent = `Selected: ${selected}`;
-    }
+        #wheel-canvas {
+            width: 100%;
+            height: 100%;
+            filter: drop-shadow(0 0 20px rgba(0,0,0,0.5));
+        }
 
-    function renderItems() {
-      itemsListEl.innerHTML = '';
-      items.forEach((item, i) => {
-        const li = document.createElement('li');
-        li.textContent = item;
+        .pointer {
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 50px;
+            background: #ff4d4d;
+            clip-path: polygon(0% 0%, 100% 0%, 50% 100%);
+            z-index: 10;
+            filter: drop-shadow(0 4px 4px rgba(0,0,0,0.3));
+        }
 
-        const removeBtn = document.createElement('button');
-        removeBtn.textContent = '✕';
-        removeBtn.className = 'secondary';
-        removeBtn.onclick = () => {
-          items.splice(i, 1);
-          saveItems();
-          renderItems();
-          drawWheel();
+        .spin-button {
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        
+        .spin-button:active {
+            transform: scale(0.95);
+        }
+
+        .item-list-item {
+            animation: slideIn 0.3s ease-out forwards;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.1);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        
+        <div class="lg:col-span-7 flex flex-col items-center">
+            <header class="text-center mb-8">
+                <h1 class="text-4xl font-800 tracking-tight mb-2 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
+                    SPIN WHEEL PRO
+                </h1>
+                <p class="text-slate-400">Random selection made beautiful</p>
+            </header>
+
+            <div class="wheel-container">
+                <div class="pointer"></div>
+                <canvas id="wheel-canvas"></canvas>
+            </div>
+
+            <div class="mt-12 text-center">
+                <button id="spin-btn" class="spin-button px-12 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full text-xl font-bold shadow-lg shadow-blue-900/40 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                    SPIN NOW
+                </button>
+                <div id="result-display" class="mt-6 h-12 text-2xl font-bold text-emerald-400 transition-all duration-500 opacity-0 transform translate-y-4">
+                    Winner: <span id="winner-text"></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="lg:col-span-5 w-full">
+            <div class="glass rounded-3xl p-6 shadow-2xl">
+                <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M5 4a1 1 0 00-2 0v7.268a2 2 0 000 3.464V16a1 1 0 102 0v-1.268a2 2 0 000-3.464V4zM11 4a1 1 0 10-2 0v1.268a2 2 0 000 3.464V16a1 1 0 102 0V8.732a2 2 0 000-3.464V4zM16 3a1 1 0 011 1v7.268a2 2 0 010 3.464V16a1 1 0 11-2 0v-1.268a2 2 0 010-3.464V4a1 1 0 011-1z" /></svg>
+                    Manage Items
+                </h2>
+
+                <div class="flex gap-2 mb-6">
+                    <input type="text" id="item-input" placeholder="Enter item name..." 
+                        class="flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-white">
+                    <button id="add-btn" class="bg-emerald-600 hover:bg-emerald-500 px-6 py-3 rounded-xl font-bold transition-colors">
+                        Add
+                    </button>
+                </div>
+
+                <div id="items-list" class="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+                </div>
+
+                <div class="mt-6 pt-6 border-t border-white/10 flex justify-between items-center text-sm text-slate-400">
+                    <span id="item-count">0 items</span>
+                    <button id="reset-btn" class="hover:text-white transition-colors underline decoration-dotted underline-offset-4">Reset to default</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <audio id="tick-sound" src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3" preload="auto"></audio>
+    <audio id="win-sound" src="https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3" preload="auto"></audio>
+
+    <script>
+        const canvas = document.getElementById('wheel-canvas');
+        const ctx = canvas.getContext('2d');
+        const spinBtn = document.getElementById('spin-btn');
+        const itemInput = document.getElementById('item-input');
+        const addBtn = document.getElementById('add-btn');
+        const itemsList = document.getElementById('items-list');
+        const resultDisplay = document.getElementById('result-display');
+        const winnerText = document.getElementById('winner-text');
+        const tickSound = document.getElementById('tick-sound');
+        const winSound = document.getElementById('win-sound');
+        const resetBtn = document.getElementById('reset-btn');
+
+        let items = JSON.parse(localStorage.getItem('spinItems')) || ['Pizza', 'Burger', 'Sushi', 'Tacos', 'Salad', 'Pasta'];
+        let currentRotation = 0;
+        let isSpinning = false;
+        const colors = [
+            '#4F46E5', '#10B981', '#F59E0B', '#EF4444', 
+            '#8B5CF6', '#EC4899', '#06B6D4', '#F97316'
+        ];
+
+        function init() {
+            // Re-calculate size based on container
+            const container = canvas.parentElement;
+            const size = container.offsetWidth || 500; // Fallback to 500 if offsetWidth is 0
+            const dpr = window.devicePixelRatio || 1;
+            
+            canvas.width = size * dpr;
+            canvas.height = size * dpr;
+            ctx.resetTransform();
+            ctx.scale(dpr, dpr);
+            
+            drawWheel();
+            renderItemList();
+        }
+
+        function drawWheel() {
+            const dpr = window.devicePixelRatio || 1;
+            const size = canvas.width / dpr;
+            
+            // Safety check: if size is 0 or negative, skip drawing to avoid IndexSizeError
+            if (size <= 0) return;
+
+            const centerX = size / 2;
+            const centerY = size / 2;
+            const radius = Math.max(0, size / 2 - 20); // Ensure radius is never negative
+
+            ctx.clearRect(0, 0, size, size);
+
+            if (items.length === 0) {
+                ctx.fillStyle = 'rgba(255,255,255,0.1)';
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = 'white';
+                ctx.textAlign = 'center';
+                ctx.font = '16px Inter';
+                ctx.fillText('Add items to start', centerX, centerY);
+                return;
+            }
+
+            const sliceAngle = (Math.PI * 2) / items.length;
+
+            items.forEach((item, i) => {
+                const angle = currentRotation + i * sliceAngle;
+                
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, angle, angle + sliceAngle);
+                ctx.fillStyle = colors[i % colors.length];
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#16213e';
+                ctx.stroke();
+
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.rotate(angle + sliceAngle / 2);
+                ctx.textAlign = 'right';
+                ctx.fillStyle = 'white';
+                ctx.font = `bold ${Math.max(10, Math.min(18, 18 - (items.length * 0.4)))}px Inter`;
+                ctx.fillText(item, radius - 25, 5);
+                ctx.restore();
+            });
+
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.lineWidth = 8;
+            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, Math.min(20, radius * 0.2), 0, Math.PI * 2);
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fill();
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        }
+
+        function spin() {
+            if (isSpinning || items.length < 2) return;
+
+            isSpinning = true;
+            spinBtn.disabled = true;
+            resultDisplay.style.opacity = '0';
+            resultDisplay.classList.add('translate-y-4');
+
+            tickSound.volume = 0.2;
+            winSound.volume = 0.4;
+
+            const extraSpins = 6 + Math.random() * 4;
+            const totalRotation = extraSpins * Math.PI * 2;
+            const duration = 4500;
+            const startRotation = currentRotation;
+            const startTime = performance.now();
+
+            let lastTickIndex = -1;
+
+            function animate(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const ease = 1 - Math.pow(1 - progress, 4);
+                
+                currentRotation = startRotation + totalRotation * ease;
+                
+                const sliceAngle = (Math.PI * 2) / items.length;
+                const currentTickIndex = Math.floor(
+                    ((3 * Math.PI / 2 - currentRotation) % (Math.PI * 2) + (Math.PI * 2)) % (Math.PI * 2) / sliceAngle
+                );
+                
+                if (currentTickIndex !== lastTickIndex) {
+                    tickSound.currentTime = 0;
+                    tickSound.play().catch(() => {});
+                    lastTickIndex = currentTickIndex;
+                }
+
+                drawWheel();
+
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    finishSpin();
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        function finishSpin() {
+            isSpinning = false;
+            spinBtn.disabled = false;
+            
+            const sliceAngle = (Math.PI * 2) / items.length;
+            const normalizedRotation = ((3 * Math.PI / 2 - currentRotation) % (Math.PI * 2) + (Math.PI * 2)) % (Math.PI * 2);
+            const winnerIndex = Math.floor(normalizedRotation / sliceAngle);
+            const winner = items[winnerIndex];
+
+            winnerText.innerText = winner;
+            resultDisplay.style.opacity = '1';
+            resultDisplay.classList.remove('translate-y-4');
+            winSound.play().catch(() => {});
+        }
+
+        function renderItemList() {
+            itemsList.innerHTML = '';
+            items.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'item-list-item flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/5 hover:border-white/20 transition-all group';
+                div.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-3 h-3 rounded-full" style="background-color: ${colors[index % colors.length]}"></div>
+                        <span class="font-medium text-white">${item}</span>
+                    </div>
+                    <button onclick="removeItem(${index})" class="text-slate-500 hover:text-red-400 p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                `;
+                itemsList.appendChild(div);
+            });
+            document.getElementById('item-count').innerText = `${items.length} items`;
+            localStorage.setItem('spinItems', JSON.stringify(items));
+            drawWheel();
+        }
+
+        window.removeItem = (index) => {
+            if (isSpinning) return;
+            items.splice(index, 1);
+            renderItemList();
         };
 
-        li.appendChild(removeBtn);
-        itemsListEl.appendChild(li);
-      });
-    }
+        addBtn.addEventListener('click', () => {
+            const val = itemInput.value.trim();
+            if (val && !isSpinning) {
+                items.push(val);
+                itemInput.value = '';
+                renderItemList();
+            }
+        });
 
-    addBtn.onclick = () => {
-      const value = newItemInput.value.trim();
-      if (!value) return;
-      items.push(value);
-      newItemInput.value = '';
-      saveItems();
-      renderItems();
-      drawWheel();
-    };
+        itemInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addBtn.click();
+        });
 
-    spinBtn.onclick = spin;
-    resetBtn.onclick = () => {
-      angle = 0;
-      resultEl.textContent = '';
-      drawWheel();
-    };
+        spinBtn.addEventListener('click', spin);
 
-    renderItems();
-    drawWheel();
-  </script>
+        resetBtn.addEventListener('click', () => {
+            if (confirm('Are you sure you want to reset to default items?')) {
+                items = ['Pizza', 'Burger', 'Sushi', 'Tacos', 'Salad', 'Pasta'];
+                renderItemList();
+            }
+        });
+
+        window.addEventListener('resize', init);
+        
+        // Initial load with a small delay to ensure container width is calculated correctly
+        window.onload = () => {
+            setTimeout(init, 100);
+        };
+    </script>
 </body>
 </html>
